@@ -1,0 +1,54 @@
+{
+	"name": "@343dev/gifsicle",
+	"version": "0.0.1",
+	"description": "gifsicle binary wrapper",
+	"keywords": [
+		"gifsicle",
+		"image-compression",
+		"image",
+		"img",
+		"gif",
+		"optimize",
+		"compress",
+		"minify"
+	],
+	"license": "GPL-2.0-only",
+	"author": "Andrey Warkentin (https://github.com/343dev)",
+	"repository": {
+		"type": "git",
+		"url": "git+https://github.com/343dev/gifsicle.git"
+	},
+	"type": "module",
+	"engines": {
+		"node": ">=18.17"
+	},
+	"files": [
+		"vendor/",
+		"cli.js",
+		"index.js",
+		"postinstall.js"
+	],
+	"bin": {
+		"gifsicle": "cli.js"
+	},
+	"exports": "./index.js",
+	"scripts": {
+		"lint": "npx eslint ./",
+		"postinstall": "node postinstall.js",
+		"update-git-hooks": "npx simple-git-hooks"
+	},
+	"devDependencies": {
+		"@343dev/eslint-config": "^2.0.0",
+		"eslint": "^9.13.0",
+		"lint-staged": "^15.5.0",
+		"simple-git-hooks": "^2.12.1"
+	},
+	"lint-staged": {
+		"*.js": [
+			"eslint --fix"
+		]
+	},
+	"simple-git-hooks": {
+		"pre-commit": "npx lint-staged"
+	}
+}
