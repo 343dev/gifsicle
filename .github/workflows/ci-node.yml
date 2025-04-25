@@ -7,17 +7,18 @@ on:
     branches: [main]
 
 jobs:
-  run_tests:
+  tests:
     runs-on: ${{ matrix.os }}
     strategy:
       matrix:
-        node-version: [18.17.0, latest]
+        node-version: [latest]
         os: [
             ubuntu-latest, # x64
             ubuntu-24.04-arm, # arm64
             macos-13, # x64
             macos-latest, # arm64
             windows-latest, # x64
+            windows-11-arm, # arm64
           ]
     steps:
       - name: Checkout repository
