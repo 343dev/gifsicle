@@ -38,16 +38,3 @@ gifsicle --optimize=2 --colors=128 --lossy=40 gif-not-optimized.gif > optimized.
 
 [Read the gifsicle man page](https://www.lcdf.org/gifsicle/man.html)
 
-## Troubleshooting
-
-### Alpine Linux compatibility
-
-If you see a 'not found' error when running the bundled binaries on Alpine Linux, this is due to Alpine’s use of musl libc (not glibc), which is incompatible with these prebuilt binaries.
-
-Install the `gcompat` compatibility package:
-
-```sh
-apk add gcompat
-```
-
-After installing, the bundled binaries should run as expected.
