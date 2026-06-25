@@ -1,6 +1,6 @@
 {
 	"name": "@343dev/gifsicle",
-	"version": "1.1.0",
+	"version": "1.2.0",
 	"description": "gifsicle binary wrapper",
 	"keywords": [
 		"gifsicle",
@@ -25,8 +25,7 @@
 	"files": [
 		"vendor/",
 		"cli.js",
-		"index.js",
-		"postinstall.js"
+		"index.js"
 	],
 	"bin": {
 		"gifsicle": "cli.js"
@@ -34,7 +33,6 @@
 	"exports": "./index.js",
 	"scripts": {
 		"lint": "npx eslint ./",
-		"postinstall": "node postinstall.js",
 		"update-git-hooks": "npx simple-git-hooks"
 	},
 	"devDependencies": {
