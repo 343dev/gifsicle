@@ -1,0 +1,3 @@
+# Bound resource use before decompression
+
+The package will reject encoded input over 128 MiB, GIFs with more than 100,000 frames, a logical canvas over 134,217,728 pixels, or total frame area over 134,217,728 pixels. These fixed safety limits are enforced in the patched Gifsicle parser before expensive pixel allocation because encoded size alone does not bound a GIF’s decoded memory use, and using a separate JavaScript parser could create inconsistent interpretations of malformed data. The WebAssembly heap may grow to 4 GiB, but heap exhaustion remains a runtime failure rather than the normal resource-control mechanism.
