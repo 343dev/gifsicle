@@ -1,49 +1,148 @@
 # @343dev/gifsicle
 
-[![NPM Downloads](https://img.shields.io/npm/dw/%40343dev%2Fgifsicle)](https://www.npmjs.com/package/@343dev/gifsicle)
-[![npm](https://img.shields.io/npm/v/@343dev/gifsicle.svg)](https://www.npmjs.com/package/@343dev/gifsicle)
+Node.js WebAssembly API and narrow CLI for single-GIF optimization with
+[Gifsicle 1.96](https://www.lcdf.org/gifsicle/).
 
-[gifsicle](https://www.lcdf.org/gifsicle/) binary wrapper for Node.js
+## Requirements
 
-Supported:
-- OS platform: `darwin`, `linux`, `win32`.
-- CPU architecture: `arm64`, `x64`.
+- Node.js 22.22.1 or later
+- ESM
 
-## Introduction
+The package has no runtime dependencies, native executables, install scripts,
+platform allowlist, or first-run downloads. Every optimization uses a fresh
+Worker Thread and fresh WebAssembly instance.
 
-Gifsicle manipulates GIF image files. Depending on command line options, it can merge several GIFs into a GIF animation; explode an animation into its component frames; change individual frames in an animation; turn interlacing on and off; add transparency; add delays, disposals, and looping to animations; add and remove comments; flip and rotate; optimize animations for space; change images' colormaps; and other things.
-
-## Usage
-
-Install:
+## Installation
 
 ```sh
-npm i -g @343dev/gifsicle
+npm install @343dev/gifsicle
 ```
 
-Use:
+## API
+
+```js
+import optimize from '@343dev/gifsicle';
+import { readFile, writeFile } from 'node:fs/promises';
+
+const input = await readFile('input.gif');
+const output = await optimize(input, {
+	optimize: 3,
+	colors: 128,
+	lossy: 20,
+	gamma: 'srgb',
+});
+await writeFile('output.gif', output);
+```
+
+The named and default `optimize` exports are the same function. Input must be a
+`Buffer` or `Uint8Array`; its selected bytes are copied synchronously and caller
+storage is not changed or detached. The promise resolves to a Node.js `Buffer`
+after the operation's Worker exits. Gifsicle's output is returned even when it
+is larger than the input.
+
+Calling `optimize(input)` or `optimize(input, {})` runs the Gifsicle merge/write
+pipeline without enabling an optimization setting.
+
+### Options
+
+```ts
+interface OptimizeOptions {
+	readonly optimize?: false | 0 | 1 | 2 | 3;
+	readonly careful?: boolean;
+	readonly colors?: false | number; // Integer from 2 through 256
+	readonly lossy?: false | number; // Integer from 0 through 2,147,483,647
+	readonly gamma?: false | number | 'srgb' | 'oklab';
+}
+```
+
+Options must be a plain object. Unknown properties, coercible strings, boxed
+values, fractional integer settings, non-finite numbers, and out-of-range values
+are rejected. Numeric gamma must be greater than zero. Gamma affects color
+reduction only when `colors` is enabled. Practical lossy values are generally
+small even though the full Gifsicle 1.96 C `int` range is accepted.
+
+### Errors
+
+```js
+import { errorCodes } from '@343dev/gifsicle';
+
+try {
+	await optimize(input);
+} catch (error) {
+	if (error.code === errorCodes.INVALID_INPUT) {
+		// Invalid GIF or a resource-policy limit.
+	}
+}
+```
+
+Stable codes are `INVALID_INPUT`, `INVALID_OPTIONS`, `PROCESSING_FAILED`,
+`WASM_OUT_OF_MEMORY`, and `WORKER_FAILED`. Error messages and causes are
+intended for diagnostics and are not a stable interface.
+
+Encoded input is limited to 128 MiB. Parsing also limits GIFs to 100,000 frames,
+a 134,217,728-pixel logical canvas, and 134,217,728 total frame pixels. These
+policy failures are `INVALID_INPUT`; actual heap exhaustion is
+`WASM_OUT_OF_MEMORY`.
+
+Metadata follows Gifsicle behavior. Comments, names, extensions, frame
+rectangles, disposal encoding, and palette representation are not guaranteed to
+remain byte-identical. Lossless optimization guarantees are verified through
+rendered playback, timing, and looping instead.
+
+## CLI
 
 ```sh
-gifsicle --optimize=2 --colors=128 --lossy=40 gif-not-optimized.gif > optimized.gif
+gifsicle --optimize=3 --colors 128 input.gif output.gif
+gifsicle --lossy=20 - - < input.gif > output.gif
 ```
 
-## Notes
+Exactly one input operand is required. Output defaults to standard output. `-`
+denotes standard input or output. Options must precede operands; `--` ends
+option parsing.
 
-**gifsicle** normally processes input GIF files according to its command line options and writes the result to the standard output.
+Supported options:
 
-**gifsicle**’s command line consists of GIF input files and options. Most options start with a dash `-` or plus `+`; frame selections, a kind of option, start with a number sign `#`. Anything else is a GIF input file.
+- `--optimize`, `--optimize=LEVEL`, `--no-optimize`
+- `--careful`, `--no-careful`
+- `--colors VALUE`, `--colors=VALUE`, `--no-colors`
+- `--lossy`, `--lossy=VALUE`
+- `--gamma VALUE`, `--gamma=VALUE`
+- `--help`, `--version`
 
-**gifsicle** reads and processes GIF input files in order. If no GIF input file is given, or you give the special filename `-`, it reads from the standard input.
+Bare `--optimize` means level 1 and bare `--lossy` means 20. Optional values use
+`=` only. The CLI rejects duplicate and unsupported options, refuses binary
+output to a terminal, and atomically replaces regular output files.
 
-**gifsicle** exits with status `0` if there were no errors and status `1` otherwise.
+Exit statuses are 0 for success/information, 1 for invalid GIF or processing
+failure, 2 for usage, 3 for filesystem or pipe failure, 4 for Worker/WebAssembly
+runtime failure, 130 for SIGINT, and 143 for SIGTERM.
 
-[Read the gifsicle man page](https://www.lcdf.org/gifsicle/man.html)
+This is not the full upstream Gifsicle CLI. Use upstream Gifsicle for merging,
+frame editing, resizing, metadata editing, or other command modes.
 
+## Source and reproducible build
 
-## Other projects
+The npm artifact includes complete corresponding source and build materials.
+See [UPSTREAM.md](UPSTREAM.md) and [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md).
 
-- 🖼 [optimizt](https://github.com/343dev/optimizt) — CLI tool for image optimization: compresses PNG, JPEG, GIF, SVG, and creates AVIF/WebP
-- 📦 [harold](https://github.com/343dev/harold) — CLI tool that compares frontend project bundle sizes between snapshots
-- 🐳 [jailbot](https://github.com/343dev/jailbot) — Docker container wrapper with automatic filesystem path mounting
-- 📝 [markdown-lint](https://github.com/343dev/markdown-lint) — Markdown code style linter based on Prettier, Remark, and Typograf
-- 🔤 [languagetool-node](https://github.com/343dev/languagetool-node) — CLI spell and grammar checker powered by LanguageTool
+```sh
+npm run verify:upstream
+npm run verify:patch
+npm run setup-emsdk
+npm run build:wasm
+npm run verify:dist
+npm run build:native
+npm run verify:native-sanitizers
+npm run verify:parity
+npm run benchmark
+```
+
+Emscripten 6.0.9 and its emsdk commit are pinned. Building is a maintainer action;
+package installation never invokes these commands. Native parity uses the Linux x64
+GCC 14.2.0 environment documented in `verification/native-reference.md`; set
+`GIFSICLE_NATIVE` to that build before running parity or benchmarks. The committed
+parity manifest records exact native and WebAssembly sizes and hashes. Benchmark
+measurements in `verification/benchmark.json` retain startup-inclusive no-options,
+lossless, and lossy baselines without enforcing a performance ratio.
+
+See [MIGRATION.md](MIGRATION.md) when updating from the 1.x executable-path API.

@@ -6,30 +6,95 @@ on:
   pull_request:
     branches: [main]
 
+permissions:
+  contents: read
+
 jobs:
   tests:
-    permissions:
-      contents: read
     runs-on: ${{ matrix.os }}
     strategy:
+      fail-fast: false
       matrix:
-        node-version: [latest]
-        os: [
-            ubuntu-latest, # x64
-            ubuntu-24.04-arm, # arm64
-            macos-15-intel, # x64
-            macos-15, # arm64
-            windows-latest, # x64
-            windows-11-arm, # arm64
-          ]
+        node-version: [22.22.1, 24]
+        os:
+          - ubuntu-latest # Linux x64
+          - ubuntu-24.04-arm # Linux ARM64
+          - macos-15-intel # macOS x64
+          - macos-15 # macOS ARM64
+          - windows-latest # Windows x64
+          - windows-11-arm # Windows ARM64
     steps:
       - name: Checkout repository
-        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
         with:
           persist-credentials: false
-      - name: Node.js ${{ matrix.node-version }} on ${{ matrix.os }}
+      - name: Use Node.js ${{ matrix.node-version }}
         uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
         with:
           node-version: ${{ matrix.node-version }}
-      - name: Install dependencies
-        run: npm ci
+          cache: npm
+      - name: Install development dependencies
+        run: npm ci --ignore-scripts
+      - name: Lint
+        run: npm run lint
+      - name: Check declarations
+        run: npm run test:types
+      - name: Run ordinary tests
+        run: node --test --test-concurrency=1 test/api.test.js test/cli.test.js test/limits.test.js test/playback.test.js
+      - name: Verify installed package
+        run: node --test test/package.test.js
+
+  wasm-reproducibility:
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          persist-credentials: false
+      - name: Use Node.js 24
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with:
+          node-version: 24
+          cache: npm
+      - name: Install development dependencies
+        run: npm ci --ignore-scripts
+      - name: Verify source and patch
+        run: npm run verify:upstream && npm run verify:patch
+      - name: Install pinned Emscripten
+        run: npm run setup-emsdk
+      - name: Verify committed distribution
+        run: npm run verify:dist
+
+  native-evidence:
+    runs-on: ubuntu-24.04
+    container:
+      image: gcc:14.2.0@sha256:82549aa8f90ada3236a8be70c74543132a76662ef33f0c3271ed802b81584a82
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          persist-credentials: false
+      - name: Use Node.js 24
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with:
+          node-version: 24
+          cache: npm
+      - name: Install development dependencies
+        run: npm ci --ignore-scripts
+      - name: Build canonical native reference
+        run: npm run build:native
+      - name: Verify exact native and WebAssembly parity
+        run: npm run verify:parity
+      - name: Verify native bridge with sanitizers
+        run: npm run verify:native-sanitizers
+      - name: Regenerate benchmark evidence
+        env:
+          GIFSICLE_NATIVE: ${{ github.workspace }}/verification/gifsicle-native
+          GIFSICLE_BENCHMARK_ITERATIONS: 5
+        run: npm run benchmark > /tmp/benchmark.json
+      - name: Retain benchmark evidence
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: gifsicle-benchmark
+          path: /tmp/benchmark.json
+          if-no-files-found: error
