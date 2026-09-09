@@ -9,9 +9,14 @@ on:
 permissions:
   contents: read
 
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
   tests:
     runs-on: ${{ matrix.os }}
+    timeout-minutes: 20
     strategy:
       fail-fast: false
       matrix:
@@ -42,10 +47,11 @@ jobs:
       - name: Run ordinary tests
         run: node --test --test-concurrency=1 test/api.test.js test/cli.test.js test/limits.test.js test/playback.test.js
       - name: Verify installed package
-        run: node --test test/package.test.js
+        run: npm run test:package
 
   wasm-reproducibility:
     runs-on: ubuntu-24.04
+    timeout-minutes: 60
     steps:
       - name: Checkout repository
         uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
@@ -67,6 +73,7 @@ jobs:
 
   native-evidence:
     runs-on: ubuntu-24.04
+    timeout-minutes: 45
     container:
       image: gcc:14.2.0@sha256:82549aa8f90ada3236a8be70c74543132a76662ef33f0c3271ed802b81584a82
     steps:
