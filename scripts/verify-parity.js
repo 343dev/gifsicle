@@ -18,7 +18,7 @@ const manifest = JSON.parse(await readFile(
 	new URL('../verification/parity-manifest.json', import.meta.url),
 	'utf8',
 ));
-const nativeExecutable = process.env.GIFSICLE_NATIVE ?? path.join(
+const nativeExecutable = process.env.GIFSICLE_NATIVE || path.join(
 	root,
 	'verification/gifsicle-native',
 );

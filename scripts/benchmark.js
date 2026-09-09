@@ -33,7 +33,7 @@ const iterations = Number(process.env.GIFSICLE_BENCHMARK_ITERATIONS ?? 10);
 if (!Number.isSafeInteger(iterations) || iterations < 1) {
 	throw new Error('GIFSICLE_BENCHMARK_ITERATIONS must be a positive integer');
 }
-if (nativeExecutable === undefined) {
+if (!nativeExecutable) {
 	throw new Error('GIFSICLE_NATIVE must identify the canonical native reference');
 }
 
