@@ -107,8 +107,16 @@ test('the npm artifact installs and runs without lifecycle scripts', { timeout: 
 	`;
 	await command(process.execPath, ['--input-type=module', '--eval', smoke], { cwd: installation });
 
-	const cli = path.join(installation, 'node_modules/.bin/gifsicle');
-	const { stdout: version } = await command(cli, ['--version'], { cwd: installation });
+	const { stdout: version } = await command(process.execPath, [
+		npmCliPath,
+		'exec',
+		'--offline',
+		'--prefix',
+		installation,
+		'--',
+		'gifsicle',
+		'--version',
+	]);
 	assert.equal(version, '1.96\n');
 
 	await assert.rejects(

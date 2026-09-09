@@ -59,6 +59,10 @@ function sha256(value) {
 	return createHash('sha256').update(value).digest('hex');
 }
 
+function shellQuote(value) {
+	return `'${value.replaceAll('\'', String.raw`'\''`)}'`;
+}
+
 test('prints standalone help and embedded upstream version', async () => {
 	const help = await run(['--help']);
 	assert.equal(help.status, 0);
@@ -209,6 +213,30 @@ test('creates output with mode derived from the process umask', {
 test('refuses binary standard output connected to a terminal', {
 	skip: process.platform === 'win32',
 }, async () => {
+	if (process.platform === 'darwin') {
+		// macOS ships the BSD script utility, which has neither util-linux's -c
+		// option nor its -e child-status propagation option.
+		const directory = await mkdtemp(path.join(tmpdir(), 'gifsicle-tty-'));
+		const runnerPath = path.join(directory, 'run.sh');
+		const statusPath = path.join(directory, 'status');
+		await writeFile(runnerPath, `#!/bin/sh
+${shellQuote(process.execPath)} ${shellQuote(cliPath)} ${shellQuote(fixturePath)}
+status=$?
+printf '%s' "$status" > ${shellQuote(statusPath)}
+`, { mode: 0o700 });
+		// BSD script probes its own stdin with tcgetattr/ioctl before creating the
+		// pseudo-terminal. Node connects execFile's stdin to a socket, for which
+		// macOS reports EOPNOTSUPP instead of the ENOTTY that script handles.
+		// Redirecting stdin from /dev/null lets script use its non-terminal path.
+		const result = await execFileAsync('/bin/sh', [
+			'-c',
+			`exec /usr/bin/script -q /dev/null ${shellQuote(runnerPath)} < /dev/null`,
+		], { encoding: 'utf8' });
+		assert.equal(await readFile(statusPath, 'utf8'), '3');
+		assert.match(result.stdout, /Refusing to write binary GIF data to a terminal/);
+		return;
+	}
+
 	await assert.rejects(
 		execFileAsync('script', [
 			'-qefc',
@@ -243,17 +271,41 @@ test('classifies a broken standard-output pipe as a filesystem failure', async (
 	assert.match(result.stderr.toString(), /EPIPE|broken pipe/i);
 });
 
-test('uses conventional exit status after a cancellation signal', async () => {
+test('uses conventional exit status after a cancellation signal', {
+	// Windows does not implement POSIX signals: child.kill() terminates the
+	// process directly instead of delivering SIGINT or SIGTERM to its handlers.
+	skip: process.platform === 'win32',
+}, async () => {
 	for (const [signal, status] of [['SIGINT', 130], ['SIGTERM', 143]]) {
-		const input = Buffer.alloc(32 * 1024 * 1024);
-		let child;
-		const resultPromise = run(['-'], {
-			input,
-			onSpawn: (spawned) => {
-				child = spawned;
-			},
+		const child = spawn(process.execPath, [cliPath, '-']);
+		const stdout = [];
+		const resultPromise = new Promise((resolve, reject) => {
+			child.stdout.on('data', (chunk) => {
+				stdout.push(chunk);
+			});
+			child.once('error', reject);
+			child.once('close', childStatus => resolve({
+				status: childStatus,
+				stdout: Buffer.concat(stdout),
+			}));
 		});
-		await new Promise(resolve => setTimeout(resolve, 75));
+		child.stdin.on('error', (error) => {
+			if (error.code !== 'EPIPE') {
+				throw error;
+			}
+		});
+
+		// Filling more than a pipe buffer proves the CLI has started reading
+		// stdin, and therefore installed its signal handlers, before the kill.
+		await new Promise((resolve, reject) => {
+			child.stdin.write(Buffer.alloc(1024 * 1024), (error) => {
+				if (error) {
+					reject(error);
+				} else {
+					resolve();
+				}
+			});
+		});
 		child.kill(signal);
 		const result = await resultPromise;
 		assert.equal(result.status, status, signal);

@@ -1,3 +1,7 @@
+# Keep project text files consistent across platforms. In particular, CLI
+# hashbangs must use LF even when Git is configured with core.autocrlf=true.
+* text=auto eol=lf
+
 # The upstream provenance manifests and snapshot must retain repository bytes.
 upstream/gifsicle.sha256 text eol=lf
 upstream/gifsicle.modes text eol=lf
