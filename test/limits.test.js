@@ -38,19 +38,21 @@ test('accepts logical-canvas and cumulative-frame-area boundaries', async () => 
 
 	header.writeUInt16LE(16_384, 6);
 	header.writeUInt16LE(8192, 8);
-	assert.ok(await optimize(Buffer.concat([
+	const maximumCanvasGif = Buffer.concat([
 		header,
 		frame,
 		Buffer.from([0x3B]),
-	])) instanceof Buffer);
+	]);
+	assert.ok(await optimize(maximumCanvasGif) instanceof Buffer);
 
 	const originalHeader = base.subarray(0, imageSeparator);
 	const frames = Array.from({ length: 128 }, () => frame);
-	assert.ok(await optimize(Buffer.concat([
+	const maximumFrameAreaGif = Buffer.concat([
 		originalHeader,
 		...frames,
 		Buffer.from([0x3B]),
-	])) instanceof Buffer);
+	]);
+	assert.ok(await optimize(maximumFrameAreaGif) instanceof Buffer);
 });
 
 test('rejects the 100,001st frame while accepting 100,000 small frames', {

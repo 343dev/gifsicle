@@ -78,12 +78,12 @@ test('the npm artifact installs and runs without lifecycle scripts', { timeout: 
 	]) {
 		assert.ok(names.includes(required), `missing ${required}`);
 	}
-	assert.ok(!names.some(name => name.startsWith('vendor/')));
-	assert.ok(!names.some(name => name.startsWith('.cache/') || name.startsWith('test/')));
-	assert.ok(!names.some(name => name.endsWith('.map') || name.endsWith('.debug') || name.endsWith('.o')));
-	assert.ok(!names.some(name => /(?:^|\/)gifsicle-native(?:\.exe)?$/.test(name)));
-	assert.ok(!names.some(name => /(?:^|\/)(?:benchmark-inputs?|bench-fixtures?)(?:\/|$)/.test(name)));
-	assert.ok(!names.some(name => name.endsWith('.tmp')));
+	assert.ok(names.every(name => !name.startsWith('vendor/')));
+	assert.ok(names.every(name => !name.startsWith('.cache/') && !name.startsWith('test/')));
+	assert.ok(names.every(name => !name.endsWith('.map') && !name.endsWith('.debug') && !name.endsWith('.o')));
+	assert.ok(names.every(name => !/(?:^|\/)gifsicle-native(?:\.exe)?$/.test(name)));
+	assert.ok(names.every(name => !/(?:^|\/)(?:benchmark-inputs?|bench-fixtures?)(?:\/|$)/.test(name)));
+	assert.ok(names.every(name => !name.endsWith('.tmp')));
 
 	await writeFile(path.join(staging, 'package.json'), '{"private":true}');
 	await command(process.execPath, [
@@ -122,7 +122,10 @@ test('the npm artifact installs and runs without lifecycle scripts', { timeout: 
 	const distributionFiles = await readdir(
 		path.join(installation, 'node_modules/@343dev/gifsicle/dist'),
 	);
-	assert.deepEqual(distributionFiles.toSorted(), ['gifsicle.mjs', 'gifsicle.wasm']);
+	assert.deepEqual(
+		distributionFiles.toSorted((first, second) => first.localeCompare(second)),
+		['gifsicle.mjs', 'gifsicle.wasm'],
+	);
 	const installedPackageBytes = await readFile(
 		path.join(installation, 'node_modules/@343dev/gifsicle/package.json'),
 		'utf8',

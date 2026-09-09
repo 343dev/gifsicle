@@ -50,11 +50,11 @@ const expectedModes = await readManifest(
 	'mode',
 );
 const listedFiles = await listFiles(upstreamRoot);
-const files = listedFiles.toSorted();
+const files = listedFiles.toSorted((first, second) => first.localeCompare(second));
 const fileSet = new Set(files);
 for (const manifest of [expectedHashes, expectedModes]) {
 	const onDiskOnly = files.filter(file => !manifest.has(file));
-	const manifestOnly = [...manifest.keys()].filter(file => !fileSet.has(file));
+	const manifestOnly = manifest.keys().filter(file => !fileSet.has(file)).toArray();
 	if (onDiskOnly.length > 0 || manifestOnly.length > 0) {
 		throw new Error(
 			'Upstream snapshot file list differs from its manifest; '

@@ -25,11 +25,13 @@ const exitCodes = {
 	SIGTERM: 143,
 };
 
-let receivedSignal;
-let forceExitArmed = false;
-let signalReject;
-let cancellationPromise = Promise.resolve();
-let cancelCurrentOperation = async () => {};
+const signalState = {
+	receivedSignal: undefined,
+	isForceExitArmed: false,
+	reject: undefined,
+	cancellationPromise: Promise.resolve(),
+	cancelCurrentOperation: async () => {},
+};
 
 class CliError extends Error {
 	constructor(message, exitCode, cause) {
@@ -82,8 +84,8 @@ function parseArguments(arguments_) {
 	const operands = [];
 	const seen = new Set();
 	let informational;
-	let parsingOptions = true;
-	let optionsEndedExplicitly = false;
+	let isParsingOptions = true;
+	let isOptionsEndedExplicitly = false;
 
 	const markSeen = (name) => {
 		if (seen.has(name)) {
@@ -109,17 +111,17 @@ function parseArguments(arguments_) {
 
 	for (let index = 0; index < arguments_.length; index += 1) {
 		const argument = arguments_[index];
-		if (parsingOptions && argument === '--') {
-			parsingOptions = false;
-			optionsEndedExplicitly = true;
+		if (isParsingOptions && argument === '--') {
+			isParsingOptions = false;
+			isOptionsEndedExplicitly = true;
 			continue;
 		}
-		if (!parsingOptions || operands.length > 0 || !argument.startsWith('--')) {
-			if (!optionsEndedExplicitly && operands.length > 0 && argument.startsWith('--')) {
+		if (!isParsingOptions || operands.length > 0 || !argument.startsWith('--')) {
+			if (!isOptionsEndedExplicitly && operands.length > 0 && argument.startsWith('--')) {
 				throw usageError('Options must precede operands');
 			}
 			operands.push(argument);
-			parsingOptions = false;
+			isParsingOptions = false;
 			continue;
 		}
 
@@ -231,16 +233,16 @@ Options:
 }
 
 function throwIfSignalled() {
-	if (receivedSignal) {
-		throw new SignalError(receivedSignal);
+	if (signalState.receivedSignal) {
+		throw new SignalError(signalState.receivedSignal);
 	}
 }
 
 async function readBounded(stream) {
 	const chunks = [];
 	let size = 0;
-	cancelCurrentOperation = async () => {
-		stream.destroy(new SignalError(receivedSignal));
+	signalState.cancelCurrentOperation = async () => {
+		stream.destroy(new SignalError(signalState.receivedSignal));
 	};
 	try {
 		for await (const chunk of stream) {
@@ -254,8 +256,8 @@ async function readBounded(stream) {
 			chunks.push(chunk);
 		}
 	} finally {
-		await cancellationPromise;
-		cancelCurrentOperation = async () => {};
+		await signalState.cancellationPromise;
+		signalState.cancelCurrentOperation = async () => {};
 	}
 	throwIfSignalled();
 	return Buffer.concat(chunks, size);
@@ -277,13 +279,13 @@ async function readInput(inputPath) {
 			);
 		}
 		const abortController = new AbortController();
-		cancelCurrentOperation = async () => abortController.abort();
+		signalState.cancelCurrentOperation = async () => abortController.abort();
 		let input;
 		try {
 			input = await readFile(inputPath, { signal: abortController.signal });
 		} finally {
-			await cancellationPromise;
-			cancelCurrentOperation = async () => {};
+			await signalState.cancellationPromise;
+			signalState.cancelCurrentOperation = async () => {};
 		}
 		throwIfSignalled();
 		return input;
@@ -321,6 +323,14 @@ function temporaryPath(outputPath) {
 	return path.join(directory, `.${basename}.${process.pid}.${randomUUID()}.tmp`);
 }
 
+async function ignoreErrors(operation) {
+	try {
+		await operation();
+	} catch {
+		// Cleanup is best effort and must not hide the original failure.
+	}
+}
+
 async function preflightOutput(outputPath) {
 	if (outputPath === '-') {
 		if (process.stdout.isTTY) {
@@ -335,14 +345,14 @@ async function preflightOutput(outputPath) {
 	let temporary;
 	const cleanUp = async () => {
 		if (handle) {
-			await handle.close().catch(() => {});
+			await ignoreErrors(() => handle.close());
 			handle = undefined;
 		}
 		if (temporary) {
-			await unlink(temporary).catch(() => {});
+			await ignoreErrors(() => unlink(temporary));
 		}
 	};
-	cancelCurrentOperation = cleanUp;
+	signalState.cancelCurrentOperation = cleanUp;
 	try {
 		const currentOutput = await outputStatistics(outputPath);
 		if (currentOutput && (currentOutput.mode & 0o222) === 0) {
@@ -363,27 +373,29 @@ async function preflightOutput(outputPath) {
 		}
 		throw new CliError(`Cannot write output: ${error.message}`, exitCodes.filesystem, error);
 	} finally {
-		await cancellationPromise;
+		await signalState.cancellationPromise;
 		await cleanUp();
-		cancelCurrentOperation = async () => {};
+		signalState.cancelCurrentOperation = async () => {};
 	}
 	throwIfSignalled();
 }
 
 async function writeStandardOutput(output) {
 	await new Promise((resolve, reject) => {
-		let settled = false;
+		let isSettled = false;
 		const onError = (error) => {
-			if (!settled) {
-				settled = true;
-				reject(error);
+			if (isSettled) {
+				return;
 			}
+
+			isSettled = true;
+			reject(error);
 		};
 		const onComplete = (error) => {
 			if (error) {
 				onError(error);
-			} else if (!settled) {
-				settled = true;
+			} else if (!isSettled) {
+				isSettled = true;
 				resolve();
 			}
 		};
@@ -395,17 +407,17 @@ async function writeStandardOutput(output) {
 async function writeFileAtomically(outputPath, output) {
 	const temporary = temporaryPath(outputPath);
 	let handle;
-	let renamed = false;
+	let isRenamed = false;
 	const cleanUp = async () => {
 		if (handle) {
-			await handle.close().catch(() => {});
+			await ignoreErrors(() => handle.close());
 			handle = undefined;
 		}
-		if (!renamed) {
-			await unlink(temporary).catch(() => {});
+		if (!isRenamed) {
+			await ignoreErrors(() => unlink(temporary));
 		}
 	};
-	cancelCurrentOperation = cleanUp;
+	signalState.cancelCurrentOperation = cleanUp;
 	try {
 		handle = await open(temporary, 'wx', 0o600);
 		await handle.writeFile(output);
@@ -419,24 +431,24 @@ async function writeFileAtomically(outputPath, output) {
 		handle = undefined;
 		throwIfSignalled();
 		await rename(temporary, outputPath);
-		renamed = true;
+		isRenamed = true;
 		throwIfSignalled();
 	} finally {
-		await cancellationPromise;
+		await signalState.cancellationPromise;
 		await cleanUp();
-		cancelCurrentOperation = async () => {};
+		signalState.cancelCurrentOperation = async () => {};
 	}
 }
 
 async function writeOutput(outputPath, output) {
 	try {
 		if (outputPath === '-') {
-			cancelCurrentOperation = async () => process.stdout.destroy();
+			signalState.cancelCurrentOperation = async () => process.stdout.destroy();
 			try {
 				await writeStandardOutput(output);
 			} finally {
-				await cancellationPromise;
-				cancelCurrentOperation = async () => {};
+				await signalState.cancellationPromise;
+				signalState.cancelCurrentOperation = async () => {};
 			}
 			throwIfSignalled();
 			return;
@@ -463,20 +475,20 @@ function forceExit(signal) {
 }
 
 function handleSignal(signal) {
-	if (forceExitArmed) {
+	if (signalState.isForceExitArmed) {
 		forceExit(signal);
 		return;
 	}
-	forceExitArmed = true;
+	signalState.isForceExitArmed = true;
 	process.off('SIGINT', handleSignal);
 	process.off('SIGTERM', handleSignal);
 	process.on('SIGINT', forceExit);
 	process.on('SIGTERM', forceExit);
-	receivedSignal = signal;
+	signalState.receivedSignal = signal;
 	process.exitCode = exitCodes[signal];
-	signalReject?.(new SignalError(signal));
-	const cancel = cancelCurrentOperation;
-	cancellationPromise = Promise.resolve().then(() => cancel());
+	signalState.reject?.(new SignalError(signal));
+	const cancel = signalState.cancelCurrentOperation;
+	signalState.cancellationPromise = (async () => cancel())();
 }
 
 async function main() {
@@ -496,10 +508,9 @@ async function main() {
 	const input = await readInput(inputPath);
 	throwIfSignalled();
 	const operation = createOperation(input, options);
-	cancelCurrentOperation = operation.terminate;
-	const signalPromise = new Promise((_, reject) => {
-		signalReject = reject;
-	});
+	signalState.cancelCurrentOperation = operation.terminate;
+	const { promise: signalPromise, reject } = Promise.withResolvers();
+	signalState.reject = reject;
 	let output;
 	try {
 		output = await Promise.race([operation.promise, signalPromise]);
@@ -509,9 +520,9 @@ async function main() {
 		}
 		throw new CliError(error.message, optimizationExitCode(error), error);
 	} finally {
-		signalReject = undefined;
-		await cancellationPromise;
-		cancelCurrentOperation = async () => {};
+		signalState.reject = undefined;
+		await signalState.cancellationPromise;
+		signalState.cancelCurrentOperation = async () => {};
 	}
 	throwIfSignalled();
 	await writeOutput(outputPath, output);
@@ -523,8 +534,8 @@ process.on('SIGTERM', handleSignal);
 try {
 	await main();
 } catch (error) {
-	if (error instanceof SignalError || receivedSignal) {
-		process.exitCode = exitCodes[receivedSignal ?? error.signal];
+	if (error instanceof SignalError || signalState.receivedSignal) {
+		process.exitCode = exitCodes[signalState.receivedSignal ?? error.signal];
 	} else {
 		process.stderr.write(`${error.message}\n`);
 		process.exitCode = error.exitCode ?? exitCodes.runtime;

@@ -34,8 +34,12 @@ async function run(arguments_, options = {}) {
 		options.onSpawn?.(child);
 		const stdout = [];
 		const stderr = [];
-		child.stdout.on('data', chunk => stdout.push(chunk));
-		child.stderr.on('data', chunk => stderr.push(chunk));
+		child.stdout.on('data', (chunk) => {
+			stdout.push(chunk);
+		});
+		child.stderr.on('data', (chunk) => {
+			stderr.push(chunk);
+		});
 		child.once('error', reject);
 		child.once('close', status => resolve({
 			status,
@@ -186,7 +190,7 @@ test('preflights unwritable output and cleans temporary files', async () => {
 	const preserved = await readFile(outputPath);
 	assert.equal(preserved.toString(), 'existing');
 	const entries = await readdir(directory);
-	assert.deepEqual(entries.toSorted(), ['output.gif']);
+	assert.deepEqual(entries.toSorted((first, second) => first.localeCompare(second)), ['output.gif']);
 });
 
 test('creates output with mode derived from the process umask', {
@@ -225,7 +229,9 @@ test('classifies a broken standard-output pipe as a filesystem failure', async (
 		const child = spawn(process.execPath, [cliPath, '-']);
 		const stderr = [];
 		child.stdout.destroy();
-		child.stderr.on('data', chunk => stderr.push(chunk));
+		child.stderr.on('data', (chunk) => {
+			stderr.push(chunk);
+		});
 		child.once('error', reject);
 		child.once('close', status => resolve({
 			status,
