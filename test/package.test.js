@@ -51,6 +51,7 @@ test('the npm artifact installs and runs without lifecycle scripts', { timeout: 
 		'scripts/benchmark.js',
 		'scripts/build-native.sh',
 		'scripts/build-wasm.sh',
+		'scripts/emsdk-version.sh',
 		'scripts/native-reference.js',
 		'scripts/setup-emsdk.sh',
 		'scripts/verify-dist.sh',

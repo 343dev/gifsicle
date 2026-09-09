@@ -2,10 +2,12 @@
 set -euo pipefail
 
 readonly ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+# shellcheck source=scripts/emsdk-version.sh
+source "$ROOT/scripts/emsdk-version.sh"
+readonly EMSDK_VERSION
 readonly UPSTREAM="$ROOT/upstream/gifsicle"
 readonly PATCH="$ROOT/upstream/gifsicle-wasm.patch"
 readonly OUTPUT_DIR="${WASM_OUTPUT_DIR:-$ROOT/dist}"
-readonly EXPECTED_VERSION='6.0.9'
 readonly SDK_DIR="${EMSDK_INSTALL_DIR:-$ROOT/.cache/emsdk}"
 readonly EMCC="$SDK_DIR/upstream/emscripten/emcc"
 
@@ -16,9 +18,9 @@ if [[ ! -x "$EMCC" ]]; then
 fi
 
 actual_version="$("$EMCC" --version | grep -m 1 emcc)"
-if [[ "$actual_version" != *" $EXPECTED_VERSION "* ]]; then
+if [[ "$actual_version" != *" $EMSDK_VERSION "* ]]; then
   printf 'Expected Emscripten %s, got: %s\n' \
-    "$EXPECTED_VERSION" "$actual_version" >&2
+    "$EMSDK_VERSION" "$actual_version" >&2
   exit 1
 fi
 
@@ -69,9 +71,9 @@ mkdir -p "$build_dir/objects" "$OUTPUT_DIR"
 objects+=("$build_dir/objects/stable-qsort.o")
 for source in "${sources[@]}"; do
   object="$build_dir/objects/${source%.c}.o"
-  extra=()
+  extra=(-I"$build_dir" -I"$build_dir/include")
   if [[ "$source" == 'gifsicle.c' ]]; then
-    extra=(-Dmain=gifsicle_cli_main)
+    extra+=(-Dmain=gifsicle_cli_main)
   fi
   "$EMCC" \
     -O3 \
@@ -81,8 +83,6 @@ for source in "${sources[@]}"; do
     -fdebug-prefix-map="$build_dir"=/gifsicle-source \
     -fmacro-prefix-map="$build_dir"=/gifsicle-source \
     -std=gnu11 \
-    -I"$build_dir" \
-    -I"$build_dir/include" \
     "${extra[@]}" \
     -c "$build_dir/src/$source" \
     -o "$object"
@@ -104,5 +104,9 @@ done
   -sEXPORTED_RUNTIME_METHODS=HEAPU8,UTF8ToString \
   -o "$OUTPUT_DIR/gifsicle.mjs"
 
+if [[ ! -f "$OUTPUT_DIR/gifsicle.wasm" ]]; then
+  printf 'Emscripten did not produce %s/gifsicle.wasm\n' "$OUTPUT_DIR" >&2
+  exit 1
+fi
 printf 'Built %s and %s\n' \
   "$OUTPUT_DIR/gifsicle.mjs" "$OUTPUT_DIR/gifsicle.wasm"

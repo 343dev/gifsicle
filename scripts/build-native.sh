@@ -27,6 +27,10 @@ cleanup() {
   rm -rf "$build_dir"
 }
 trap cleanup EXIT
+(
+  cd "$UPSTREAM"
+  sha256sum --check --strict --quiet "$ROOT/upstream/gifsicle.sha256"
+)
 cp -a "$UPSTREAM/." "$build_dir/"
 (
   cd "$build_dir"
@@ -46,11 +50,12 @@ compile_flags=(-O3 -DNDEBUG -DHAVE_CONFIG_H=1 -std=gnu11)
 link_flags=(-O3 -DNDEBUG -std=gnu11)
 if [[ "${NATIVE_SANITIZE:-0}" == '1' ]]; then
   compile_flags=(
-    -O1 -g -DHAVE_CONFIG_H=1 -std=gnu11 -fno-omit-frame-pointer
+    -O1 -g -DNDEBUG -DHAVE_CONFIG_H=1 -std=gnu11 -fno-omit-frame-pointer
     -fsanitize=address,undefined
   )
   link_flags=(
-    -O1 -g -std=gnu11 -fno-omit-frame-pointer -fsanitize=address,undefined
+    -O1 -g -DNDEBUG -std=gnu11 -fno-omit-frame-pointer
+    -fsanitize=address,undefined
   )
 fi
 "$CC" "${compile_flags[@]}" \

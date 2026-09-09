@@ -7,6 +7,16 @@
 #include <string.h>
 #include <lcdfgif/gif.h>
 
+int
+gifsicle_deterministic_rand(void)
+{
+  static uint32_t state = 1;
+  state ^= state << 13;
+  state ^= state >> 17;
+  state ^= state << 5;
+  return (int) (state & 0x7FFFFFFFU);
+}
+
 void
 gifsicle_stable_qsort(void *base, size_t count, size_t size,
                       int (*compare)(const void *, const void *))

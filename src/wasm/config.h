@@ -34,8 +34,12 @@
 #define SIZEOF_VOID_P 8
 #endif
 #define PATHNAME_SEPARATOR '/'
-#define RANDOM rand
+/* The native and WebAssembly builds must use the same random sequence. */
+int gifsicle_deterministic_rand(void);
+#define RANDOM gifsicle_deterministic_rand
 
+/* config.h precedes <stdlib.h>, so this macro also rewrites libc's qsort
+   declaration. Keep this signature compatible with the standard function. */
 void gifsicle_stable_qsort(void *, size_t, size_t,
                            int (*)(const void *, const void *));
 #define qsort gifsicle_stable_qsort

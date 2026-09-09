@@ -2,9 +2,10 @@
 set -euo pipefail
 
 readonly ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+# shellcheck source=scripts/emsdk-version.sh
+source "$ROOT/scripts/emsdk-version.sh"
+readonly EMSDK_VERSION EMSDK_COMMIT
 readonly SDK_DIR="${EMSDK_INSTALL_DIR:-$ROOT/.cache/emsdk}"
-readonly EMSDK_VERSION='6.0.9'
-readonly EMSDK_COMMIT='5eb0bde7585670252e8ba05e9d361627bffd08b5'
 
 if [[ -e "$SDK_DIR" && ! -d "$SDK_DIR/.git" ]]; then
   printf '%s exists but is not an emsdk Git checkout\n' "$SDK_DIR" >&2
