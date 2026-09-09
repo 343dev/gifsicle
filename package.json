@@ -64,7 +64,7 @@
 		"verify:patch": "./scripts/verify-patch.sh",
 		"verify:upstream": "node ./scripts/verify-upstream.js",
 		"lint": "eslint ./",
-		"update-git-hooks": "simple-git-hooks"
+		"enable-git-hooks": "git config core.hooksPath .githooks"
 	},
 	"devDependencies": {
 		"@343dev/eslint-config": "4.0.0",
@@ -72,15 +72,11 @@
 		"eslint": "9.39.2",
 		"lint-staged": "16.2.7",
 		"sharp": "0.35.4",
-		"simple-git-hooks": "2.13.1",
 		"typescript": "5.9.2"
 	},
 	"lint-staged": {
 		"*.js": [
 			"eslint --fix"
 		]
-	},
-	"simple-git-hooks": {
-		"pre-commit": "npx lint-staged"
 	}
 }

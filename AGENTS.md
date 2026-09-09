@@ -1,3 +1,8 @@
+## Development
+
+- Use `npm`; keep `package-lock.json` in sync with `package.json`.
+- After cloning, run `npm run enable-git-hooks` once to use the versioned hooks in `.githooks/`.
+
 ## Agent skills
 
 ### Issue tracker

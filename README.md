@@ -120,6 +120,16 @@ runtime failure, 130 for SIGINT, and 143 for SIGTERM.
 This is not the full upstream Gifsicle CLI. Use upstream Gifsicle for merging,
 frame editing, resizing, metadata editing, or other command modes.
 
+## Development
+
+After cloning the repository, enable Git hooks once:
+
+```sh
+npm run enable-git-hooks
+```
+
+This configures Git to use the versioned hooks from the [.githooks](./.githooks) directory.
+
 ## Source and reproducible build
 
 The npm artifact includes complete corresponding source and build materials.
