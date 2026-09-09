@@ -1,16 +1,15 @@
 {
 	"name": "@343dev/gifsicle",
-	"version": "1.2.0",
-	"description": "gifsicle binary wrapper",
+	"version": "2.0.0",
+	"description": "Node.js WebAssembly API and CLI for Gifsicle GIF optimization",
 	"keywords": [
 		"gifsicle",
-		"image-compression",
+		"image-optimization",
 		"image",
-		"img",
 		"gif",
 		"optimize",
 		"compress",
-		"minify"
+		"webassembly"
 	],
 	"license": "GPL-2.0-only",
 	"author": "Andrey Warkentin (https://github.com/343dev)",
@@ -19,34 +18,67 @@
 		"url": "git+https://github.com/343dev/gifsicle.git"
 	},
 	"type": "module",
+	"types": "./index.d.ts",
 	"engines": {
-		"node": ">=18.17"
+		"node": ">=22.22.1"
 	},
 	"files": [
-		"vendor/",
+		"dist/",
+		"lib/",
+		"upstream/",
+		"src/wasm/",
+		"scripts/",
+		"verification/benchmark.json",
+		"verification/native-reference.md",
+		"verification/parity-manifest.json",
+		"docs/adr/",
+		"CONTEXT.md",
 		"cli.js",
-		"index.js"
+		"index.js",
+		"index.d.ts",
+		"LICENSE",
+		"README.md",
+		"CHANGELOG.md",
+		"MIGRATION.md",
+		"THIRD_PARTY_NOTICES.md",
+		"UPSTREAM.md"
 	],
 	"bin": {
 		"gifsicle": "cli.js"
 	},
-	"exports": "./index.js",
+	"exports": {
+		".": {
+			"types": "./index.d.ts",
+			"import": "./index.js"
+		}
+	},
 	"scripts": {
-		"lint": "npx eslint ./",
-		"update-git-hooks": "npx simple-git-hooks"
+		"benchmark": "node ./scripts/benchmark.js",
+		"build:native": "./scripts/build-native.sh",
+		"build:wasm": "./scripts/build-wasm.sh",
+		"setup-emsdk": "./scripts/setup-emsdk.sh",
+		"test": "node --test --test-concurrency=1 test/*.test.js",
+		"test:package": "node --test test/package.test.js",
+		"test:types": "tsc --noEmit",
+		"verify:dist": "./scripts/verify-dist.sh",
+		"verify:native-sanitizers": "./scripts/verify-native-sanitizers.sh",
+		"verify:parity": "node ./scripts/verify-parity.js",
+		"verify:patch": "./scripts/verify-patch.sh",
+		"verify:upstream": "node ./scripts/verify-upstream.js",
+		"lint": "eslint ./",
+		"enable-git-hooks": "git config core.hooksPath .githooks"
 	},
 	"devDependencies": {
-		"@343dev/eslint-config": "4.0.0",
-		"eslint": "9.39.2",
-		"lint-staged": "16.2.7",
-		"simple-git-hooks": "2.13.1"
+		"@343dev/eslint-config": "5.0.0",
+		"@types/node": "22.20.1",
+		"eslint": "10.10.0",
+		"lint-staged": "17.5.0",
+		"sharp": "0.35.4",
+		"typescript": "7.0.2"
 	},
 	"lint-staged": {
 		"*.js": [
 			"eslint --fix"
 		]
-	},
-	"simple-git-hooks": {
-		"pre-commit": "npx lint-staged"
 	}
 }

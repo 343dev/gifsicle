@@ -1,0 +1,3 @@
+# Use a reproducible native reference
+
+WebAssembly parity will be measured against a Linux x64 Gifsicle 1.96 executable built from the vendored snapshot with pinned GCC 14.2.0, `-O3 -DNDEBUG`, threads disabled, and SIMD disabled, not against the existing opaque vendored executable. The WebAssembly build uses the corresponding optimization profile without pthreads or SIMD. A fresh source build already differs from the existing executable for Optimizt’s lossy preset, so treating the unreproducible artifact as authoritative would make parity impossible to audit; the historical difference will instead be documented during migration.
